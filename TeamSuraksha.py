@@ -3,19 +3,20 @@ import face_recognition
 import cv2
 
 class FacialData:
-    def __init__(self, id, name, location, timestamp, threat_level):
+    def __init__(self, id, name, location, timestamp, threat_level, image_path):
         self.id = id
         self.name = name
         self.location = location
         self.timestamp = timestamp
         self.threat_level = threat_level
+        self.image_path = image_path
 
 class FacialDatabase:
     def __init__(self):
         self.facial_data_list = []
 
-    def add_facial_data(self, id, name, location, timestamp, threat_level):
-        facial_data = FacialData(id, name, location, timestamp, threat_level)
+    def add_facial_data(self, id, name, location, timestamp, threat_level, image_path):
+        facial_data = FacialData(id, name, location, timestamp, threat_level, image_path)
         self.facial_data_list.append(facial_data)
 
     def find_person_by_name(self, name):
@@ -29,11 +30,14 @@ class FaceRecognizer:
         self.database = database
 
     def scan_faces(self, location, timestamp, duration):
-        video_path= "vid.mp4"
+        video_path = "data/video-2.mp4"
         cap = cv2.VideoCapture(video_path)
 
-        target_time = cv2.CAP_PROP_POS_MSEC
-        cap.set(target_time, timestamp)
+        # Load the pre-trained face detection model
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+
+#target_time = cv2.CAP_PROP_POS_MSEC
+#cap.set(target_time, timestamp)
 
         identified_faces = []
         while cap.isOpened():
@@ -50,8 +54,19 @@ class FaceRecognizer:
            
                 cv2.rectangle(frame, (left, top), (right, bottom), (0, 0, 255), 2)
 
-  
-                identified_faces.append(FacialData(id=None, name=None, location=location, timestamp=timestamp, threat_level=None))
+                x = left
+                y = top
+                w = right - left
+                h = bottom - top
+                #ret = self.identify_face_of_region(rgb_frame, x, y, w, h, taylor_image_path)
+                ret = self.find_match(rgb_frame, x, y, w, h)
+
+                if (ret is not None):
+                    print("---- SUCCESS ----")
+                    identified_faces.append(FacialData(id=None, name="Taylor", location=location, timestamp=timestamp, threat_level=None, image_path=ret.image_path))
+                    cv2.putText(frame, ret.name, (left, bottom + 15), cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 0, 255), 2, cv2.LINE_8)
+                else:
+                    print("No match in current frame")
 
        
             cv2.imshow('Video', frame)
@@ -63,6 +78,37 @@ class FaceRecognizer:
         cv2.destroyAllWindows()
 
         return identified_faces
+
+    def find_match(self, frame, x, y, w, h):
+        for p in self.database.facial_data_list:
+            ret = self.identify_face_of_region(frame, x, y, w, h, p.image_path)
+            print(" ", p.name, " ", p.image_path, " ", ret)
+            if ret:
+                return p
+        return None
+            
+    def identify_face_of_region(self, frame, x, y, w, h, face_to_identify_image_path):
+        # Convert the frame to grayscale
+        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        image_to_match = cv2.imread(face_to_identify_image_path)
+        gray_image_to_match = cv2.cvtColor(image_to_match, cv2.COLOR_BGR2GRAY)
+
+        # Extract the region of interest (ROI) containing the face
+        face_roi = gray_frame[y:y+h, x:x+w]
+
+        # Resize the face ROI to match the size of the image to match
+        face_roi_resized = cv2.resize(face_roi, (image_to_match.shape[1], image_to_match.shape[0]))
+
+	    # Compare the face ROI with the image to match
+        difference = cv2.absdiff(face_roi_resized, gray_image_to_match)
+        mean_difference = difference.mean()
+        print(mean_difference, end="")
+
+        # Threshold for considering a match
+        if mean_difference < 60:
+            return True
+
+        return False
 
     def classify_threat_level(self, identified_faces):
         threat_levels = {}
@@ -78,6 +124,7 @@ class FaceRecognizer:
         if num_people >= 4:
             print(f"Alert: Level 3 - {num_people} people identified simultaneously in {location}")
 
+
 def main():
     parser = argparse.ArgumentParser(description="Facial Recognition System")
     parser.add_argument("usage", choices=["find_person", "scan_faces"], help="Select the usage type")
@@ -89,13 +136,13 @@ def main():
     args = parser.parse_args()
 
     facial_database = FacialDatabase()
-    facial_database.add_facial_data(1, "Taylor Swift", "Location1", "2024-01-23 12:00:00", 1)
-    facial_database.add_facial_data(2, "Taylor Swift", "Location2", "2024-01-23 12:30:00", 2)
-    facial_database.add_facial_data(3, "Selena Gomez", "Location3", "2024-01-23 13:00:00", 3)
-    facial_database.add_facial_data(4, "Olivia Rodrigo", "Location1", "2024-01-23 14:00:00", 2)
-    facial_database.add_facial_data(5, "Sabrina Carpenter", "Location4", "2024-01-23 14:30:00", 4)
-    facial_database.add_facial_data(6, "Jennie Kim", "Location2", "2024-01-23 15:00:00", 1)
-    facial_database.add_facial_data(7, "Shawn Mendes", "Location3", "2024-01-23 15:30:00", 3)
+    facial_database.add_facial_data(1, "Taylor Swift", "Location1", "2024-01-23 12:00:00", 1, 'data/taylor-swift.jpg')
+    facial_database.add_facial_data(2, "Taylor Swift", "Location2", "2024-01-23 12:30:00", 2, 'data/taylor-swift.jpg')
+    facial_database.add_facial_data(3, "Selena Gomez", "Location3", "2024-01-23 13:00:00", 3, 'data/selena-gomez.jpg')
+    facial_database.add_facial_data(4, "Olivia Rodrigo", "Location1", "2024-01-23 14:00:00", 2, 'data/olivia-rodrigo.jpg')
+    facial_database.add_facial_data(5, "Sabrina Carpenter", "Location4", "2024-01-23 14:30:00", 4, 'data/sabrina-carpenter.jpg')
+    facial_database.add_facial_data(6, "Jennie Kim", "Location2", "2024-01-23 15:00:00", 1, 'data/jennie-kim.jpg')
+    facial_database.add_facial_data(7, "Shawn Mendes", "Location3", "2024-01-23 15:30:00", 3, 'data/shawn-mendes.jpg')
 
     face_recognizer = FaceRecognizer(facial_database)
 
