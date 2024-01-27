@@ -3,7 +3,7 @@ import face_recognition
 import cv2
 
 class FacialData:
-    def init(self, id, name, location, timestamp, threat_level):
+    def __init__(self, id, name, location, timestamp, threat_level):
         self.id = id
         self.name = name
         self.location = location
@@ -11,7 +11,7 @@ class FacialData:
         self.threat_level = threat_level
 
 class FacialDatabase:
-    def init(self):
+    def __init__(self):
         self.facial_data_list = []
 
     def add_facial_data(self, id, name, location, timestamp, threat_level):
@@ -25,7 +25,7 @@ class FacialDatabase:
         return None
 
 class FaceRecognizer:
-    def init(self, database):
+    def __init__(self, database):
         self.database = database
 
     def scan_faces(self, location, timestamp, duration):
@@ -105,7 +105,7 @@ def main():
             return
 
         result = facial_database.find_person_by_name(args.name)
-        print("Usage 1 Result:", result.dict if result else None)
+        print("Usage 1 Result:", result.name if result else None)
 
     elif args.usage == "scan_faces":
         if not args.location or not args.timestamp or not args.duration:
@@ -121,5 +121,5 @@ def main():
 
         face_recognizer.alert_authorities(threat_levels, args.location)
 
-if name == "main":
+if __name__ == "__main__":
     main()
