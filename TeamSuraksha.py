@@ -19,18 +19,19 @@ class FacialDatabase:
         facial_data = FacialData(id, name, location, timestamp, threat_level, image_path)
         self.facial_data_list.append(facial_data)
 
-    def find_person_by_name(self, name):
-        for person in self.facial_data_list:
-            if person.name == name:
-                return person
-        return None
-
 class FaceRecognizer:
     def __init__(self, database):
         self.database = database
 
+    def find_person_by_name(self, name):
+        identified_persons = self.scan_faces(None, None, None)
+        for person in identified_persons:
+            if person.name == name:
+                return person
+        return None
+
     def scan_faces(self, location, timestamp, duration):
-        video_path = "data/video-2.mp4"
+        video_path = "data/video.mp4"
         cap = cv2.VideoCapture(video_path)
 
         # Load the pre-trained face detection model
@@ -39,7 +40,7 @@ class FaceRecognizer:
 #target_time = cv2.CAP_PROP_POS_MSEC
 #cap.set(target_time, timestamp)
 
-        identified_faces = []
+        identified_faces = set()
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
@@ -63,7 +64,7 @@ class FaceRecognizer:
 
                 if (ret is not None):
                     print("---- SUCCESS ----")
-                    identified_faces.append(FacialData(id=None, name="Taylor", location=location, timestamp=timestamp, threat_level=None, image_path=ret.image_path))
+                    identified_faces.add(ret)
                     cv2.putText(frame, ret.name, (left, bottom + 15), cv2.FONT_HERSHEY_SIMPLEX, .5, (0, 0, 255), 2, cv2.LINE_8)
                 else:
                     print("No match in current frame")
@@ -151,8 +152,13 @@ def main():
             print("Error: Name argument is required for finding a person.")
             return
 
-        result = facial_database.find_person_by_name(args.name)
-        print("Usage 1 Result:", result.name if result else None)
+        result = face_recognizer.find_person_by_name(args.name)
+        print("")
+        print("---------------------------------------+")
+        print("|                                      |")
+        print("| Usage 1 Result:", result.name if result else "NOT FOUND")
+        print("|                                      |")
+        print("---------------------------------------+")
 
     elif args.usage == "scan_faces":
         if not args.location or not args.timestamp or not args.duration:
@@ -160,10 +166,14 @@ def main():
             return
 
         identified_faces = face_recognizer.scan_faces(args.location, args.timestamp, args.duration)
-        print("Usage 2 Result:")
+        print("")
+        print("---------------------------------------+")
+        print("|                                      |")
+        print("| Usage 2 Result:")
         for face in identified_faces:
-            print(f"Name: {face.name}, Threat Level: {face.threat_level}")
-
+            print(f"| Name: {face.name}, Threat Level: {face.threat_level}")
+        print("|                                      |")
+        print("---------------------------------------+")
         threat_levels = face_recognizer.classify_threat_level(identified_faces)
 
         face_recognizer.alert_authorities(threat_levels, args.location)
